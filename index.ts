@@ -8,7 +8,7 @@ dotenv.config({ path: "./.env" });
 
 program.name("jimmy").description(" Your personal Assistant sits in your computer").version("0.1.0")
 
-program.command("fight")
+program.command("jet")
 .description("agent spin up command")
 .action(
     async()=>{

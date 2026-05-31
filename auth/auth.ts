@@ -1,13 +1,18 @@
 import chalk from "chalk";
-import { password, text, confirm,isCancel } from "@clack/prompts";
+import { password, text, confirm, isCancel } from "@clack/prompts";
 import { hashPassword, verifyPassword, encrypt, decrypt } from "./crypto";
 import { loadConfig, saveConfig, isConfigured } from "./config-store";
-import type {StoredConfig} from "./config-store";
+import type { StoredConfig } from "./config-store";
+
+export interface AuthResult {
+  config: StoredConfig;
+  password: string;
+}
 
 /**
  * First-time setup: create account and set API key
  */
-export async function setupAuth(): Promise<StoredConfig> {
+export async function setupAuth(): Promise<AuthResult> {
   console.log(chalk.bold("\n🔐 Initial Setup\n"));
 
   const username = await text({
@@ -61,13 +66,13 @@ export async function setupAuth(): Promise<StoredConfig> {
 
   saveConfig(config);
   console.log(chalk.green("\n✓ Setup complete!\n"));
-  return config;
+  return { config, password: pwd as string };
 }
 
 /**
  * Login with username and password
  */
-export async function loginAuth(): Promise<StoredConfig> {
+export async function loginAuth(): Promise<AuthResult> {
   const config = loadConfig();
   if (!config) return setupAuth();
 
@@ -97,7 +102,7 @@ export async function loginAuth(): Promise<StoredConfig> {
   config.lastLogin = Date.now();
   saveConfig(config);
   console.log(chalk.green(`\n✓ Welcome back, ${config.username}!\n`));
-  return config;
+  return { config, password: enteredPassword as string };
 }
 
 /**
@@ -114,18 +119,6 @@ export function getApiKey(config: StoredConfig, password: string): string {
 /**
  * Run auth flow: login or setup
  */
-export async function authenticate(): Promise<{ config: StoredConfig; password: string }> {
-  const config = isConfigured() ? await loginAuth() : await setupAuth();
-
-  const pwd = await password({
-    message: "Confirm password for this session",
-  });
-  if (isCancel(pwd)) throw new Error("Authentication cancelled");
-
-  if (!verifyPassword(pwd as string, config.passwordHash)) {
-    console.log(chalk.red("❌ Wrong password\n"));
-    return authenticate();
-  }
-
-  return { config, password: pwd as string };
+export async function authenticate(): Promise<AuthResult> {
+  return isConfigured() ? await loginAuth() : await setupAuth();
 }

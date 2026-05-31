@@ -364,9 +364,26 @@ export class ToolExecutor {
     return text;
   }
 
-  applyApprovedFromTracker(): { errors: string[] } {
+  applyApprovedFromTracker(): { errors: string[]; newFiles: string[] } {
     const errors: string[] = [];
     const all = [...this.tracker.getActions()];
+    // Snapshot files before applying so we can detect newly created files (e.g., by scaffolders)
+    const snapshotFiles = (root: string): Set<string> => {
+      const s = new Set<string>();
+      if (!fs.existsSync(root)) return s;
+      const walk = (dir: string) => {
+        for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, ent.name);
+          const rel = path.relative(this.config.codebasePath, full).split(path.sep).join("/");
+          if (ent.isDirectory()) walk(full);
+          else s.add(rel);
+        }
+      };
+      walk(root);
+      return s;
+    };
+
+    const preFiles = snapshotFiles(this.config.codebasePath);
 
     for (const a of all.filter(
       (x) => x.type === "folder_create" && x.status === "approved",
@@ -405,6 +422,7 @@ export class ToolExecutor {
       }
     }
 
+    // Run approved shell commands and capture output
     for (const a of all.filter(
       (x) => x.type === "tool_execute" && x.status === "approved",
     )) {
@@ -416,11 +434,26 @@ export class ToolExecutor {
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
       });
-      if (r.status && r.status !== 0)
-        errors.push(`shell exit ${r.status}: ${cmd}`);
+      const out = (r.stdout ?? "").toString();
+      const err = (r.stderr ?? "").toString();
+      if (out.trim()) console.log(`\n[Shell stdout] ${cmd}\n${out}`);
+      if (err.trim()) console.log(`\n[Shell stderr] ${cmd}\n${err}`);
+      if (r.status && r.status !== 0) errors.push(`shell exit ${r.status}: ${cmd}\n${err}`);
     }
 
-    return { errors };
+    // Snapshot after apply to detect new files (scaffolders)
+    const postFiles = snapshotFiles(this.config.codebasePath);
+    const newFiles: string[] = [];
+    for (const f of postFiles) {
+      if (!preFiles.has(f)) newFiles.push(f);
+    }
+    if (newFiles.length) {
+      console.log("\nNew files created by approved actions/shells:");
+      for (const nf of newFiles.slice(0, 200)) console.log(`  • ${nf}`);
+      if (newFiles.length > 200) console.log(`  • ...and ${newFiles.length - 200} more`);
+    }
+
+    return { errors, newFiles };
   }
 
   clearStaging():void{

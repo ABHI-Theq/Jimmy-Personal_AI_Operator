@@ -13,6 +13,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@ai-sdk/groq": "^3.0.39",
     "@clack/core": "^1.4.0",
     "@clack/prompts": "^1.5.0",
     "@mendable/firecrawl-js": "^4.25.1",

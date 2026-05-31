@@ -126,6 +126,13 @@ export async function generatePlan(goal: string, options?: { useWorkspace?: bool
           output: Output.object({ schema: planSchema }),
         });
       } catch (err: any) {
+        // Surface rate-limit style errors immediately so callers can show them
+        const msg = String(err?.message ?? err ?? '');
+        if (/rate limit|free-models-per-day|RateLimit|Rate limit/i.test(msg)) {
+          console.error('\nModel rate limit error detected: ' + msg + '\n');
+          console.log(chalk.green.bold("\nGoodBye!!!\n"))
+          process.exit(0)
+        }
         attempt++;
         const isAbort = err?.vercel?.ai?.error?.AI_APICallError || err?.name === 'AI_APICallError' || /aborted|timeout|504/i.test(String(err));
         if (!isAbort || attempt > maxRetries) throw err;
@@ -140,6 +147,12 @@ export async function generatePlan(goal: string, options?: { useWorkspace?: bool
   try {
     result = await tryGenerateStructured(2);
   } catch (err) {
+    // If this was a rate-limit style error, rethrow so the caller can handle/display it
+    const msg = String((err as any)?.message ?? err ?? '');
+    if (/rate limit|free-models-per-day|RateLimit|Rate limit/i.test(msg)) {
+      console.error('\nPlan generation aborted due to model rate limits: ' + msg + '\n');
+      throw err;
+    }
     // Fallback: generate freeform text and try to parse into steps
     //@ts-ignore
     console.warn('Structured generation failed, falling back to plain text generation:', err?.message ?? err);

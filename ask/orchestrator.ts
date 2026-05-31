@@ -194,6 +194,10 @@ export async function runAskMode() {
   const ok = await runApprovalFlow(tracker);
   if (!ok) return executor.clearStaging();
 
-  executor.applyApprovedFromTracker();
+  const { errors, newFiles } = executor.applyApprovedFromTracker();
+  if (errors && errors.length) {
+    console.log(chalk.red('\nSome operations reported errors:\n'));
+    for (const e of errors) console.log(chalk.red(`  • ${e}`));
+  }
   executor.clearStaging();
 }

@@ -23,18 +23,26 @@ export function printPlan(plan: Plan): void {
 }
 
 export async function selectSteps(plan: Plan): Promise<PlanStep[]> {
-  const options = plan.steps.map((s:any) => ({
+  const options = plan.steps.map((s: any) => ({
     value: s.id,
     label: s.title,
     hint: s.complexity ?? '',
+    disabled: false,
   }));
 
-  const picked = await multiselect<string>({
-    message: 'Select steps to execute (space toggles, enter confirms)',
-    options,
-    initialValues: plan.steps.map((s:any) => s.id),
-    required: false,
-  });
+  let picked: string[] | null = null;
+  try {
+    picked = await multiselect<string>({
+      message: 'Select steps to execute (space toggles, enter confirms)',
+      options,
+      initialValues: plan.steps.map((s: any) => s.id),
+      required: false,
+    }) as string[];
+  } catch (err) {
+    // If the multiselect UI throws (some terminals or environments), fall back to selecting all steps
+    console.warn('multiselect failed, defaulting to all steps');
+    picked = plan.steps.map((s: any) => s.id);
+  }
 
   if (isCancel(picked)) return [];
   const set = new Set<string>(picked);

@@ -124,7 +124,7 @@ export async function runPlanMode(): Promise<void> {
     const ok = await runApprovalFlow(tracker);
     if (!ok) return executor.clearStaging();
 
-    const { errors } = executor.applyApprovedFromTracker();
+    const { errors, newFiles } = executor.applyApprovedFromTracker();
     if (errors.length) {
       console.log(chalk.red('\nSome operations reported errors:\n'));
       for (const e of errors) console.log(chalk.red(`  • ${e}`));
