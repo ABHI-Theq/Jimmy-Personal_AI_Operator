@@ -1,7 +1,6 @@
 import { select, isCancel } from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
-import { modes } from "../MainMs";
 import { runCLIMode } from "../CLI/cli";
 
 const HF = "ANSI Shadow";
