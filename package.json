@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@ai-sdk/groq": "^3.0.39",
+    "@ai-sdk/openai": "^3.0.67",
+    "@browserbasehq/stagehand": "^3.4.0",
     "@clack/core": "^1.4.0",
     "@clack/prompts": "^1.5.0",
     "@mendable/firecrawl-js": "^4.25.1",
@@ -28,6 +30,7 @@
     "dotenv": "^17.4.2",
     "figlet": "^1.11.0",
     "marked": "^18.0.4",
-    "marked-terminal": "^7.3.0"
+    "marked-terminal": "^7.3.0",
+    "telegraf": "^4.16.3"
   }
 }

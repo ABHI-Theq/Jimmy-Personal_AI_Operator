@@ -1,7 +1,7 @@
 import chalk from "chalk";
-import { password, text, confirm, isCancel } from "@clack/prompts";
+import { password, text, isCancel } from "@clack/prompts";
 import { hashPassword, verifyPassword, encrypt, decrypt } from "./crypto";
-import { loadConfig, saveConfig, isConfigured } from "./config-store";
+import { loadConfig, saveConfig, isConfigured, removeConfig } from "./config-store";
 import type { StoredConfig } from "./config-store";
 
 export interface AuthResult {
@@ -114,6 +114,55 @@ export function getApiKey(config: StoredConfig, password: string): string {
   } catch {
     throw new Error("Failed to decrypt API key");
   }
+}
+
+export async function updateApiKey(): Promise<void> {
+  const config = loadConfig();
+  if (!config) {
+    console.log(chalk.yellow("No existing auth config found. Starting initial setup."));
+    await setupAuth();
+    return;
+  }
+
+  console.log(chalk.bold("\n🔄 Update OpenRouter API Key\n"));
+
+  const enteredUsername = await text({
+    message: "Username",
+    placeholder: config.username,
+  });
+  if (isCancel(enteredUsername)) throw new Error("Update cancelled");
+
+  if (enteredUsername !== config.username) {
+    console.log(chalk.red("❌ Username mismatch\n"));
+    return updateApiKey();
+  }
+
+  const enteredPassword = await password({ message: "Password" });
+  if (isCancel(enteredPassword)) throw new Error("Update cancelled");
+
+  if (!verifyPassword(enteredPassword as string, config.passwordHash)) {
+    console.log(chalk.red("❌ Wrong password\n"));
+    return updateApiKey();
+  }
+
+  const newApiKey = await text({
+    message: "New OpenRouter API Key",
+    placeholder: "sk-or-v1-...",
+    validate: (v) => {
+      if (!v?.trim()) return "API key required";
+      if (!v.includes("sk-")) return "Invalid OpenRouter key format";
+    },
+  });
+  if (isCancel(newApiKey)) throw new Error("Update cancelled");
+
+  config.apiKey = encrypt(newApiKey as string, enteredPassword as string);
+  config.lastLogin = Date.now();
+  saveConfig(config);
+  console.log(chalk.green("\n✓ OpenRouter API key updated successfully!\n"));
+}
+
+export function resetAuth(): void {
+  removeConfig();
 }
 
 /**

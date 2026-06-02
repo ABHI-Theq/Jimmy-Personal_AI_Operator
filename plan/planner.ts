@@ -108,8 +108,7 @@ export async function generatePlan(goal: string, options?: { useWorkspace?: bool
     ? { ...readOnlyTools(executor), ...(hasWeb ? createWebTools(tracker) : {}) }
     : { ...(hasWeb ? createWebTools(tracker) : {}) };
 
-  // Try robust generation with retries; if provider aborts, fall back to
-  // a plain-text generation and best-effort parsing so Plan mode still returns something.
+  // Try robust generation with retries; abort on failure so callers can show the error.
   const systemPrompt = PLAN_INSTRUCTIONS(useWorkspace ? config.codebasePath : undefined, hasWeb);
   const prompt = `User goal:\n${goal}`;
 
@@ -126,16 +125,12 @@ export async function generatePlan(goal: string, options?: { useWorkspace?: bool
           output: Output.object({ schema: planSchema }),
         });
       } catch (err: any) {
-        // Surface rate-limit style errors immediately so callers can show them
         const msg = String(err?.message ?? err ?? '');
-        if (/rate limit|free-models-per-day|RateLimit|Rate limit/i.test(msg)) {
-          console.error('\nModel rate limit error detected: ' + msg + '\n');
-          console.log(chalk.green.bold("\nGoodBye!!!\n"))
-          process.exit(0)
+        const isAbort = err?.vercel?.ai?.error?.AI_APICallError || err?.name === 'AI_APICallError' || /aborted|timeout|504/i.test(msg);
+        if (!isAbort || attempt >= maxRetries) {
+          throw err;
         }
         attempt++;
-        const isAbort = err?.vercel?.ai?.error?.AI_APICallError || err?.name === 'AI_APICallError' || /aborted|timeout|504/i.test(String(err));
-        if (!isAbort || attempt > maxRetries) throw err;
         const backoff = 500 * attempt;
         console.warn(`generatePlan: transient API error, retrying in ${backoff}ms (attempt ${attempt})`);
         await new Promise((r) => setTimeout(r, backoff));
@@ -147,35 +142,7 @@ export async function generatePlan(goal: string, options?: { useWorkspace?: bool
   try {
     result = await tryGenerateStructured(2);
   } catch (err) {
-    // If this was a rate-limit style error, rethrow so the caller can handle/display it
-    const msg = String((err as any)?.message ?? err ?? '');
-    if (/rate limit|free-models-per-day|RateLimit|Rate limit/i.test(msg)) {
-      console.error('\nPlan generation aborted due to model rate limits: ' + msg + '\n');
-      throw err;
-    }
-    // Fallback: generate freeform text and try to parse into steps
-    //@ts-ignore
-    console.warn('Structured generation failed, falling back to plain text generation:', err?.message ?? err);
-    const free = await generateText({
-      model,
-      tools,
-      stopWhen: stepCountIs(20),
-      system: systemPrompt,
-      prompt: `Produce a concise numbered roadmap for the following goal.\n\nGoal:\n${goal}`,
-    });
-    const text = free.text ?? String(free.output ?? '');
-    // Heuristic parse: find numbered lines or lines starting with "Step"
-    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    const items: string[] = [];
-    for (const ln of lines) {
-      if (/^\d+\.|^Step\b|^\-\s+/.test(ln)) items.push(ln.replace(/^\d+\.|^Step\s*\d*[:\.]?\s*/i, '').trim());
-      else if (items.length > 0) {
-        // append to last item if it's a continuation
-        items[items.length - 1] = items[items.length - 1] + ' ' + ln;
-      }
-    }
-    const steps: PlanStep[] = items.map((d, i) => ({ id: `step-${i + 1}`, title: `Step ${i + 1}`, description: d }));
-    return { goal, researchSummary: '', steps };
+    throw err;
   }
   // Normalize model output: support both `{ steps: [...] }` and `{ plan: [...] }`,
   // and tolerate items that use `step`/`description` shape instead of `title`.

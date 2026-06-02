@@ -2,6 +2,7 @@ import { select, isCancel } from "@clack/prompts";
 import chalk from "chalk";
 import figlet from "figlet";
 import { runCLIMode } from "../CLI/cli";
+import { runTelegramMode } from "../Telegram";
 
 const HF = "ANSI Shadow";
 const SHADOW = chalk.hex("#5941de");
@@ -51,7 +52,7 @@ export const startArena = async () => {
       await runCLIMode();
       continue;
     } else if (option == "Telegram") {
-      // await runTeleMode()
+      await runTelegramMode()
       continue;
     }
   }

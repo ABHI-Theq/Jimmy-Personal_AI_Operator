@@ -31,9 +31,16 @@ export async function runPlanMode(): Promise<void> {
   });
 
   const spinnerLabel = includeWorkspace ? 'Researching & drafting a plan…' : 'Drafting plan…';
-  const plan = await withSpinner(spinnerLabel, async () =>
-    generatePlan(goal.trim(), { useWorkspace: includeWorkspace as boolean }),
-  );
+  let plan;
+  try {
+    plan = await withSpinner(spinnerLabel, async () =>
+      generatePlan(goal.trim(), { useWorkspace: includeWorkspace as boolean }),
+    );
+  } catch (err) {
+    console.log(chalk.red('Plan generation failed.'));
+    console.error(err);
+    return;
+  }
   printPlan(plan);
 
   const wantsSave = await confirm({

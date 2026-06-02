@@ -1,0 +1,1 @@
+export const isOwner=(id: Number)=>String(id)===process.env.TELEGRAM_OWNER_ID

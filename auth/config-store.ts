@@ -42,3 +42,9 @@ export function isConfigured(): boolean {
 export function getConfigPath(): string {
   return CONFIG_FILE;
 }
+
+export function removeConfig(): void {
+  if (fs.existsSync(CONFIG_FILE)) {
+    fs.unlinkSync(CONFIG_FILE);
+  }
+}

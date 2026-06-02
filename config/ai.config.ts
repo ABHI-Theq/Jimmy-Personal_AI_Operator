@@ -9,9 +9,3 @@ const modelId=process.env.OPENROUTER_MODEL
 
     return provider(modelId!)
 }
-export const getAgentModel2=()=>{
-    const provider=createGroq({
-        apiKey:process.env.GROQ_API_KEY
-    })
-    
-}
