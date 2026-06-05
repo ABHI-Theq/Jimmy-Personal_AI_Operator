@@ -8,8 +8,20 @@ const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 export interface StoredConfig {
   username: string;
   passwordHash: string;
-  apiKey: string;
-  apiKeyGemini:string;
+  // encrypted keys
+  apiKey: string;          // OpenRouter
+  apiKeyGemini: string;    // Google Gemini
+  groqKey?: string;
+  telegramBotToken?: string;
+  telegramOwnerId?: string;
+  supabaseUrl?: string;
+  supabaseServiceRoleKey?: string;
+  googleClientId?: string;
+  googleClientSecret?: string;
+  firecrawlKey?: string;
+  apifyKey?: string;
+  browserbaseApiKey?: string;
+  browserbaseProjectId?: string;
   lastLogin: number;
 }
 

@@ -2,7 +2,7 @@
 import chalk from "chalk";
 import {program} from "commander";
 import { startArena } from "./tui/spinup";
-import { authenticate, getApiKey, updateApiKey, resetAuth } from "./auth/auth";
+import { authenticate, getAllKeys, updateApiKey, resetAuth } from "./auth/auth";
 import dotenv from "dotenv";
 dotenv.config({ path: "./.env" });
 
@@ -14,10 +14,12 @@ program.command("jet")
     async()=>{
         try {
             const { config, password } = await authenticate();
-            const [apiKey,apiKeyGemini] = getApiKey(config, password);
-            process.env.OPENROUTER_KEY = apiKey;
+            const keys = getAllKeys(config, password);
+            // Apply all stored keys to process.env (skip empty values)
+            for (const [k, v] of Object.entries(keys)) {
+                if (v) process.env[k] = v;
+            }
             process.env.OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
-            process.env.GOOGLE_GENERATIVE_AI_API_KEY=apiKeyGemini
             await startArena()
         } catch (error) {
             if (error instanceof Error && error.message.includes("cancelled")) {

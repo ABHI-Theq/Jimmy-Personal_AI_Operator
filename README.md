@@ -1,20 +1,103 @@
 # Jimmy — Personal AI Assistant CLI
 
-A complete, terminal-first AI agent framework with autonomous task execution, browser automation, email operations, and scheduled workflows.
+A terminal-first AI agent framework with autonomous task execution, browser automation, email operations, and serverless scheduled workflows.
+
+---
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Full Setup Guide](#full-setup-guide)
+- [CLI Commands](#cli-commands)
+- [Modes](#modes)
+  - [Agent Mode](#-agent-mode)
+  - [Plan Mode](#-plan-mode)
+  - [Browser Agent Mode](#-browser-agent-mode)
+  - [Ask Mode](#-ask-mode)
+  - [Scheduler Mode](#-scheduler-mode)
+- [Email Operations](#-email-operations)
+- [Supabase Setup](#supabase-setup-scheduler--serverless)
+- [Environment Variables](#environment-variables)
+- [Models](#models)
+- [Project Structure](#project-structure)
+- [Dependencies](#dependencies)
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Prerequisites: Bun runtime (https://bun.sh)
 bun install
 
-# First run — will prompt for username, password, and OpenRouter API key
+# First run — prompts for username, password, and OpenRouter API key
 jimmy jet
 ```
 
-After setup, `jimmy jet` takes you straight to the mode selector.
+---
+
+## Full Setup Guide
+
+### 1. Install Bun
+
+```bash
+# Windows (PowerShell)
+powershell -c "irm bun.sh/install.ps1 | iex"
+
+# macOS / Linux
+curl -fsSL https://bun.sh/install | bash
+```
+
+### 2. Clone and install dependencies
+
+```bash
+git clone <repo-url>
+cd jimmy
+bun install
+```
+
+### 3. Create your `.env` file
+
+Copy the template below into a `.env` file at the project root. Fill in the keys you need — only `OPENROUTER_KEY` is required to start.
+
+```env
+# ── REQUIRED ─────────────────────────────────────────────────────
+OPENROUTER_KEY=sk-or-v1-...
+OPENROUTER_MODEL=openrouter/free        # or any model slug
+
+# ── REQUIRED for Browser Agent and Scheduler ─────────────────────
+GROQ_API_KEY=gsk_...
+GOOGLE_GENERATIVE_AI_API_KEY=...        # Google AI Studio key
+
+# ── REQUIRED for Scheduler (Supabase) ────────────────────────────
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
+
+# ── OPTIONAL — Web search and scraping ───────────────────────────
+FIRECRAWL_KEY=fc-...
+
+# ── OPTIONAL — Gmail integration ─────────────────────────────────
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+PORT=8787                               # OAuth callback port (default 8787)
+
+# ── OPTIONAL — Telegram bot ──────────────────────────────────────
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_OWNER_ID=...                   # Your Telegram chat ID
+
+# ── OPTIONAL — Browserbase (cloud browser alternative) ───────────
+BROWSERBASE_API_KEY=...
+```
+
+### 4. First run
+
+```bash
+jimmy jet
+```
+
+On first launch, Jimmy prompts you to create a username and password, then your OpenRouter and Gemini API keys. These are AES-encrypted and stored in `~/.cccontrol/config.json` — never in plaintext.
+
+After that, `jimmy jet` goes straight to the mode selector every time.
 
 ---
 
@@ -22,388 +105,87 @@ After setup, `jimmy jet` takes you straight to the mode selector.
 
 | Command | Description |
 |---------|-------------|
-| `jimmy jet` | Launch the assistant (main interface) |
-| `jimmy set-key` | Update your stored OpenRouter API key |
-| `jimmy reset-auth` | Wipe stored credentials and config |
-| `jimmy sync-credentials` | Sync API keys to Supabase for serverless scheduler |
-| `jimmy scheduler-debug` | Debug scheduler status and test Edge Function |
+| `jimmy jet` | Launch Jimmy (main mode selector) |
+| `jimmy set-key` | Update your stored OpenRouter or Gemini API key |
+| `jimmy reset-auth` | Wipe stored credentials and start fresh |
+| `jimmy sync-credentials` | Push local API keys to Supabase `user_config` table |
+| `jimmy scheduler-debug` | Debug scheduler status and test the Edge Function |
 
 ---
 
 ## Modes
 
 ### 🤖 Agent Mode
-Full agentic loop with file system access. Give it a goal and it autonomously plans, writes, modifies, and deletes files with approval workflow.
 
-**Features:**
-- Up to 30 tool steps per task
-- File CRUD operations (create, read, modify, delete)
-- Directory operations (list, create)
-- Shell command scaffolding (`bun create vite`, `npx create-next-app`, etc.)
-- Visual diff viewer before applying changes
-- Follow-up pass for newly scaffolded projects
-- Codebase search capabilities
+Full agentic loop with filesystem access. Give it any goal in plain English; Jimmy plans and executes file operations with a diff-based approval flow before writing anything.
 
-**Tools Available:**
-- `read_file` - Read file contents
-- `create_file` - Create new files
-- `modify_file` - Edit existing files
-- `delete_file` - Remove files
-- `list_directory` - List directory contents
-- `create_folder` - Create new directories
-- `run_shell_command` - Execute shell commands
-- `grep_search` - Search codebase
-- `file_search` - Fuzzy file search
+**How it works:**
+1. You describe a goal
+2. The agent calls file/shell tools autonomously (up to 30 steps)
+3. All changes are staged — nothing is written yet
+4. You review a diff and approve or reject
+5. If a new project folder was scaffolded, Jimmy offers to run a follow-up coding pass inside it
 
-### 📋 Plan Mode
-LLM generates a structured multi-step plan. Review, toggle steps, then optionally execute via Agent Mode.
+**Available tools:**
+- `read_file` / `list_files` / `search_files` — read-only workspace access
+- `create_file` / `modify_file` / `delete_file` — staged mutations
+- `create_folder` — directory creation
+- `execute_shell` — run shell commands (scaffolding, installs, etc.)
+- `grep_search` / `file_search` — codebase search
 
-**Features:**
-- Natural language goal → structured plan
-- Optional workspace scan for context
-- Step-by-step breakdown
-- Toggle individual steps on/off
-- Execute selected steps with Agent Mode
-- Save plan to `.md` file
-- Per-step agent execution
+**Example goals:**
+```
+Build a REST API with Express and TypeScript
+Refactor all my components to use React hooks
+Add input validation to every form in this project
+Create a new Next.js app with Tailwind and set up routing
+```
+
+**Required env:** `OPENROUTER_KEY`
+
+---
+
+### 🧭 Plan Mode
+
+Generates a structured multi-step plan for your goal. Optionally scans your workspace for context before planning. You can toggle individual steps on/off, save the plan as a `.md` file, then optionally hand off selected steps to Agent Mode for execution.
+
+**How it works:**
+1. Enter your goal
+2. Choose whether to include a workspace scan
+3. Jimmy generates a step-by-step plan with titles and descriptions
+4. Toggle which steps you want to execute
+5. Optionally save to a `.md` file
+6. Optionally execute selected steps through the agent
+
+**Good for:**
+- Breaking down large features before coding
+- Getting a roadmap before committing to a direction
+- Reviewing AI's interpretation of your goal before execution
+
+**Required env:** `OPENROUTER_KEY`
+
+---
 
 ### 🌐 Browser Agent Mode
-Autonomous browser automation using Stagehand with iterative Plan → Execute → Evaluate loop.
 
-**Features:**
-- Uses Brave browser with persistent profile (stays logged in)
-- DOM-mode Stagehand agent for navigation
-- Iterative refinement (up to 5 cycles)
-- LLM-based evaluation (0–100 score)
-- Automatic retry with feedback until threshold met (80/100)
-- Screenshot capture at each step
-- JSON + Markdown report generation
-- Auto-download support for file downloads
+Autonomous browser automation using Stagehand. Runs an iterative Plan → Execute → Evaluate loop, refining until it hits a quality threshold (score ≥ 80/100) or exhausts 5 iterations.
 
-**Use Cases:**
-- LinkedIn automation (job applications, connections)
-- Web scraping with JavaScript rendering
-- Form filling and submissions
-- Multi-step workflows requiring authentication
-- Data extraction from dynamic sites
+**How it works:**
+1. You enter a query (what to do in the browser)
+2. **Planner** — LLM generates a browser automation plan
+3. **Executor** — Stagehand's `agent()` runs the goal in DOM mode
+4. **Evaluator** — LLM scores the result 0–100 for completeness and accuracy
+5. If score < 80, it feeds back issues and retries with a refined plan
+6. Stops when satisfied or after 5 iterations, returns the best result
 
-See [`plan/browser-agent/README.md`](plan/browser-agent/README.md) for detailed documentation.
+**Output:** Console summary + optional JSON and Markdown report saved to disk
 
-### 💬 Ask Mode
-Conversational Q&A with workspace access and web search capabilities. Read-only mode with optional session summary export.
+**Browser setup (for authenticated sites):**
 
-**Features:**
-- Multi-turn conversation with history
-- Read workspace files
-- List directories
-- Search codebase
-- Web search via Firecrawl
-- Web scraping via Firecrawl
-- Session summary export to `.md`
-- **Email integration** - send answers via email
-
-**Tools Available:**
-- File reading (read-only)
-- Directory listing
-- Codebase grep search
-- File fuzzy search
-- Web search
-- Web page scraping
-- All 16 email operations (see Email Operations section)
-
-### 📧 Email Operations
-Complete Gmail integration with 16 AI-powered email functions accessible from Ask Mode and Browser Agent Mode.
-
-**Available Functions:**
-- `email_send` - Send emails with attachments
-- `email_read` - Read specific email by ID
-- `email_search` - Search with Gmail query syntax
-- `email_summarize` - AI-powered email summaries
-- `email_reply` - Reply while keeping thread
-- `email_draft` - Save as draft without sending
-- `email_delete` - Permanently delete emails
-- `email_archive` - Move to archive
-- `email_label` - Add/remove labels
-- `email_classify` - Auto-categorize (work, personal, newsletter, etc.)
-- `email_extract_tasks` - Extract action items via AI
-- `email_bulk_action` - Batch operations on multiple emails
-- `email_digest` - Generate digest of recent/filtered emails
-- `email_schedule_send` - Schedule for later
-- `email_send_draft` - Send previously saved draft
-- `email_thread` - Get all messages in a thread
-
-**Gmail Authentication:**
-```bash
-# First time only - will open browser for OAuth
-jimmy jet → Ask Mode → [Use any email function]
-```
-
-Credentials stored securely in `~/.cccontrol/googleAuth/`. Refresh token auto-syncs to Supabase for serverless scheduler.
-
-### ⏰ Scheduler Mode
-AI-powered task scheduler that runs autonomously in Supabase (serverless) - **no local process needed**.
-
-**Features:**
-- Natural language → AI plans task into steps + cron schedule
-- Runs in Supabase Edge Functions via pg_cron
-- Your machine can be off - tasks still execute
-- **Auto-credential sync** - Gmail re-auth automatically updates Supabase
-- Full CRUD for tasks via CLI
-- Execution history with detailed logs
-- Optional email summaries after each run
-- Manual task triggers for testing
-
-**Step Types (all run serverless in Supabase):**
-- `web_search` - Search web via Firecrawl
-- `web_crawl` - Scrape specific URLs via Firecrawl
-- `custom` - Any AI-driven task (LLM)
-- `email_send` - Send emails via Gmail API
-
-**Example Tasks:**
-- "Every morning at 9am, search for top AI news and email me a summary"
-- "Every Monday at 10am, scrape IndieHackers for AI posts and send digest"
-- "Every 6 hours, check my Gmail for unread emails and summarize them"
-
-**Setup:**
-```bash
-# 1. Create Supabase project at supabase.com, add URL + service_role key to .env
-
-# 2. Run scheduler/SETUP-READY.sql in Supabase SQL Editor (creates all tables + cron)
-
-# 3. Deploy Edge Function
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
-./supabase/deploy.ps1
-
-# 4. Sync API keys to Supabase
-jimmy sync-credentials
-```
-
-**Managing Tasks:**
-```bash
-jimmy jet → Scheduler
-# Options:
-# - List all tasks (status, next run, history)
-# - Add new task (AI plans it for you)
-# - Manage (enable/disable, edit cron, view history, run now, delete)
-```
-
-**Debugging:**
-```bash
-# Check scheduler status
-jimmy scheduler-debug
-
-# View in Supabase
-# Dashboard → Functions → scheduler-tick → Logs
-# Dashboard → Table Editor → scheduler_runs (execution history)
-# SQL Editor → scheduler/check-status.sql (diagnostic queries)
-```
-
-**Auto-Sync on Re-auth:**
-When you re-authenticate Gmail, the refresh token automatically syncs to Supabase. No manual `supabase secrets set` needed!
-
-See [`scheduler/README.md`](scheduler/README.md) for complete documentation.
-
-### 📱 Telegram Mode
-Full bot interface for Agent, Ask, Plan, and Email capabilities over Telegram - owner-only, authenticated by chat ID.
-
-**Commands:**
-- `/start` - Welcome message
-- `/agent <goal>` - Run Agent Mode
-- `/ask <question>` - Run Ask Mode  
-- `/plan <goal>` - Generate plan with inline keyboard
-- `/email <operation>` - Email operations
-
-**Features:**
-- Inline approval flow (accept/reject/diff) via buttons
-- Step toggle keyboard for plans
-- File uploads/downloads
-- Progress updates
-- Owner authentication via chat ID
-
-**Setup:**
-```env
-TELEGRAM_BOT_TOKEN=your_bot_token
-TELEGRAM_OWNER_ID=your_chat_id
-```
-
----
-
-## Project Structure
-
-```
-jimmy/
-├── index.ts                  # CLI entry point (commander)
-├── CLI/cli.ts                # Mode selector loop
-│
-├── agent/                    # Agent Mode
-│   ├── orchestrator.ts       # Agent loop + approval flow
-│   ├── agent-tools.ts        # File/folder/shell tools
-│   ├── tool-executor.ts      # Executes staged actions
-│   ├── action-tracker.ts     # Tracks pending mutations
-│   ├── approval.ts           # CLI approval prompt
-│   ├── diff-view.ts          # Diff renderer
-│   └── types.ts              # Types
-│
-├── ask/                      # Ask Mode
-│   └── orchestrator.ts       # Ask loop with web + file + email tools
-│
-├── plan/                     # Plan Mode & Browser Agent
-│   ├── orchestrator.ts       # Plan mode loop
-│   ├── planner.ts            # LLM plan generation
-│   ├── selection.ts          # Step selection UI
-│   ├── web-tools.ts          # Firecrawl + HTTP tools
-│   ├── browser-tool.ts       # Standalone Stagehand runner
-│   ├── types.ts              # Plan types
-│   └── browser-agent/        # Browser Agent Mode
-│       ├── orchestrator.ts   # Iteration loop
-│       ├── planner.ts        # Browser plan generation
-│       ├── executor.ts       # Stagehand execution
-│       ├── evaluator.ts      # LLM scoring + feedback
-│       └── types.ts          # Browser types
-│
-├── email_ops/                # Email Operations
-│   ├── email_functions.ts    # 16 Gmail functions
-│   ├── email-tools.ts        # AI SDK tool wrappers
-│   ├── email_init.ts         # OAuth flow
-│   ├── email_server.ts       # Express OAuth server
-│   ├── email_pass_store.ts   # Credential storage
-│   └── types.ts              # Email types
-│
-├── scheduler/                # Scheduler Mode
-│   ├── orchestrator.ts       # CLI interface
-│   ├── planner.ts            # AI task planning
-│   ├── db.ts                 # Supabase client + helpers
-│   ├── config-sync.ts        # Auto credential sync
-│   ├── debug.ts              # Debug tool (`jimmy scheduler-debug`)
-│   ├── update-task-email.ts  # Update email on existing tasks
-│   ├── check-status.sql      # Diagnostic SQL queries
-│   ├── SETUP-READY.sql       # pg_cron setup (run once in Supabase)
-│   ├── ARCHITECTURE.md       # System architecture
-│   ├── TROUBLESHOOTING.md    # Debug guide
-│   └── README.md             # Complete docs
-│
-├── supabase/                 # Supabase Edge Functions
-│   ├── functions/
-│   │   └── scheduler-tick/   # Edge Function for scheduler
-│   │       ├── index.ts      # Serverless executor
-│   │       └── setup.sql     # Database setup
-│   └── deploy.ps1            # Deployment script
-│
-├── Telegram/                 # Telegram Bot
-│   ├── index.ts              # Bot setup + launch
-│   ├── handlers.ts           # Command + callback handlers
-│   ├── agent-run.ts          # Telegram-adapted runners
-│   ├── approval-session.ts   # Inline keyboard approval
-│   ├── plan-session.ts       # Inline keyboard plans
-│   ├── auth.ts               # Owner ID check
-│   └── constants.ts          # Messages
-│
-├── auth/                     # Authentication
-│   ├── auth.ts               # Login/setup/update flows
-│   ├── config-store.ts       # Persist config
-│   └── crypto.ts             # Password hash + AES encrypt
-│
-├── config/                   # AI Configuration
-│   └── ai.config.ts          # Model providers
-│
-└── tui/                      # Terminal UI
-    ├── spinner.ts            # withSpinner helper
-    ├── spinup.ts             # Mode selector
-    └── terminal-render.ts    # Markdown renderer
-```
-
----
-
-## Authentication & Security
-
-**On first run**, `jimmy jet` prompts for:
-- Username (for identification)
-- Password (for encryption)
-- OpenRouter API key (for LLM access)
-
-**Security:**
-- API key AES-encrypted with your password
-- Password stored as hash only (never plaintext)
-- Gmail refresh token stored in `~/.cccontrol/googleAuth/` (600 permissions)
-- Supabase credentials auto-synced (not in git)
-- All credentials excluded from version control
-
-**To update:**
-```bash
-jimmy set-key      # Update OpenRouter key
-jimmy reset-auth   # Wipe everything and start fresh
-```
-
----
-
-## Models
-
-| Model | Used For |
-|-------|----------|
-| OpenRouter (configurable) | Agent, Plan, Ask, Email AI functions |
-| Groq `llama-3.3-70b-versatile` | Browser Agent planner + evaluator, Scheduler planner |
-| `google/gemini-3.1-flash-lite-preview` | Stagehand browser execution |
-| OpenRouter (fallback) | Browser Agent + Scheduler fallback if primary fails |
-
-**Set your preferred model:**
-```env
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-# or
-OPENROUTER_MODEL=openai/gpt-4o
-```
-
----
-
-## Environment Variables
-
-Create a `.env` in the project root:
-
-```env
-# ============================================================
-# REQUIRED - Core LLM Access
-# ============================================================
-OPENROUTER_KEY=sk-or-v1-...
-OPENROUTER_MODEL=openrouter/free
-
-# ============================================================
-# REQUIRED - Browser Agent & Scheduler
-# ============================================================
-GROQ_API_KEY=gsk_...
-GOOGLE_GENERATIVE_AI_API_KEY=...
-
-# ============================================================
-# REQUIRED - Scheduler (Supabase)
-# ============================================================
-SUPABASE_URL=https://YOUR_PROJECT.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
-
-# ============================================================
-# OPTIONAL - Enhanced Features
-# ============================================================
-# Web scraping & search
-FIRECRAWL_KEY=fc-...
-
-# Gmail operations
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-
-# Telegram bot
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_OWNER_ID=...
-
-# Browserbase (alternative to local browser)
-BROWSERBASE_API_KEY=...
-```
-
----
-
-## Browser Agent — Brave Profile Setup
-
-To use authenticated sites (LinkedIn, Twitter, etc.), point Stagehand at your Brave profile:
+To access sites you're already logged into (LinkedIn, Twitter, etc.), point Stagehand at your Brave browser profile:
 
 ```ts
-// in plan/browser-agent/executor.ts
+// plan/browser-agent/executor.ts
 localBrowserLaunchOptions: {
   executablePath: "C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe",
   args: [
@@ -414,61 +196,281 @@ localBrowserLaunchOptions: {
 }
 ```
 
-No credentials needed — reuses your browser's existing cookies.
+**Example queries:**
+```
+Find top 5 AI jobs on LinkedIn with full job descriptions
+Get the transcript of this YouTube video: https://...
+Extract all product names and prices from this page
+Search flights NYC to LA under $300 for next Friday
+```
+
+**Required env:** `GOOGLE_GENERATIVE_AI_API_KEY`
+
+**Configuration** (in `plan/browser-agent/orchestrator.ts`):
+```ts
+maxIterations: 5        // max retries
+timeout: 120000         // 2 min per execution
+evaluationThreshold: 80 // score out of 100 to accept
+```
 
 ---
 
-## Supabase Setup (One-Time, for new users)
+### ❓ Ask Mode
 
-The scheduler runs **serverless in Supabase** via Edge Functions + pg_cron. Follow these steps after cloning the project.
+Conversational Q&A with workspace access, web search, and email integration. Read-only by default — it cannot modify files. Multi-turn with session history. At the end you can email the answer or save the session as a `.md` summary.
 
-**1. Create a Supabase project**
-- Go to [supabase.com](https://supabase.com) → New project
-- Note your **Project URL** and **service_role key** from Settings → API
+**Available tools:**
+- `read_file` / `list_files` / `search_files` / `analyze_codebase` — read your workspace
+- `web_search` / `web_scrape` — search or scrape via Firecrawl
+- All 16 email operations (see Email Operations section)
 
-**2. Add credentials to `.env`**
-```env
-SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGci...
-```
+**Flow:**
+1. Ask any question — about your code, the web, or anything
+2. Jimmy answers using tools as needed (file reads, web searches, email lookups)
+3. After each answer: ask another, send the answer to your email, or save a summary
+4. Session summary is generated by LLM and saved to a `.md` file on exit
 
-**3. Create tables (run once in SQL Editor)**
-- Open Supabase Dashboard → SQL Editor
-- Open `scheduler/SETUP-READY.sql` from this project
-- Replace `YOUR_PROJECT_REF` and `YOUR_SERVICE_ROLE_KEY` at the bottom with your values
-  - Both are in Supabase Dashboard → Settings → API
-- Paste the entire file and click **RUN**
+**Required env:** `OPENROUTER_KEY`
+**Optional:** `FIRECRAWL_KEY` (for web search/scrape), Gmail credentials (for email tools)
+
+---
+
+### ⏰ Scheduler Mode
+
+AI-powered task scheduler that runs entirely serverless in Supabase. You create tasks in plain English; Jimmy plans them into steps with a cron schedule. They execute in Supabase Edge Functions every minute — your machine can be completely off.
+
+**How it works:**
+1. Describe a repetitive task (e.g. "Every morning search top AI news and email me")
+2. Jimmy uses AI to break it into steps (`web_search`, `web_crawl`, `email_send`, `custom`) and pick a cron schedule
+3. Task is saved to Supabase `scheduler_tasks` table
+4. `pg_cron` triggers the `scheduler-tick` Edge Function every minute
+5. The Edge Function runs all due tasks, writes results to `scheduler_runs`
+
+**Step types:**
+| Type | What it does |
+|------|-------------|
+| `web_search` | Searches via Firecrawl, summarizes results with LLM |
+| `web_crawl` | Scrapes a URL via Firecrawl, extracts relevant info |
+| `custom` | Any LLM-driven task |
+| `email_send` | Sends email via Gmail API using OAuth refresh token |
+
+**Managing tasks (inside Jimmy → Scheduler):**
+- List all tasks with status, next run time, run count
+- Add new task — AI plans it for you
+- Edit cron schedule (accepts plain time like `9:00am` or full cron)
+- Toggle enable/disable
+- View run history with output and errors
+- Run now (manual trigger via Edge Function)
+- Delete task
+
+**Credentials auto-sync:** When you re-authenticate Gmail, the refresh token automatically syncs to Supabase `user_config`. The Edge Function picks it up on the next run — no manual `supabase secrets set` needed.
+
+**Required env:** `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `OPENROUTER_KEY`
+**Optional:** `FIRECRAWL_KEY` (for web steps), Gmail credentials (for email steps)
+
+See [Supabase Setup](#supabase-setup-scheduler--serverless) for deployment instructions.
+
+---
+
+## 📧 Email Operations
+
+16 Gmail functions available from Ask Mode and Scheduler Mode. First use triggers an OAuth browser flow — after that, the refresh token is stored locally and auto-synced to Supabase.
+
+| Function | Description |
+|----------|-------------|
+| `email_send` | Send with optional CC/BCC |
+| `email_read` | Read a specific email by ID |
+| `email_search` | Search with Gmail query syntax (`is:unread`, `from:x`, etc.) |
+| `email_summarize` | AI-generated 2-3 sentence summary |
+| `email_reply` | Reply while preserving thread |
+| `email_draft` | Save as draft without sending |
+| `email_delete` | Permanently delete |
+| `email_archive` | Move to archive (removes INBOX label) |
+| `email_label` | Add or remove labels |
+| `email_classify` | Auto-categorize: work / personal / newsletter / spam / etc. |
+| `email_extract_tasks` | Extract action items with LLM |
+| `email_bulk_action` | Batch delete / archive / label / mark read |
+| `email_digest` | LLM digest of recent or filtered emails |
+| `email_schedule_send` | Save draft + return scheduled time |
+| `email_send_draft` | Send a previously saved draft by ID |
+| `email_thread` | Get all messages in a thread |
+
+**Gmail auth setup:**
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com) → Create a project
+2. Enable Gmail API
+3. Create OAuth 2.0 credentials (Desktop app) → copy Client ID and Secret to `.env`
+4. Set `PORT=8787` in `.env`
+5. On first email use, Jimmy opens a browser for Google login
+6. Credentials stored in `~/.cccontrol/googleAuth/` with `600` permissions
+
+---
+
+## Supabase Setup (Scheduler + Serverless)
+
+### Step 1 — Create a Supabase project
+
+Go to [supabase.com](https://supabase.com) → New project. From Settings → API, copy:
+- **Project URL** → `SUPABASE_URL` in `.env`
+- **service_role secret** → `SUPABASE_SERVICE_ROLE_KEY` in `.env`
+
+### Step 2 — Create all tables (run once)
+
+1. Open Supabase Dashboard → SQL Editor
+2. Open `scheduler/SETUP-READY.sql` from this project
+3. At the bottom of the file, replace:
+   - `YOUR_PROJECT_REF` with your project reference ID (from the URL: `https://YOUR_PROJECT_REF.supabase.co`)
+   - `YOUR_SERVICE_ROLE_KEY` with your service_role key
+4. Paste the entire file into SQL Editor and click **RUN**
 
 This creates:
-- `scheduler_tasks` — your scheduled task definitions
+- `scheduler_tasks` — task definitions
 - `scheduler_runs` — execution history
 - `user_config` — API keys synced from your machine
-- `pg_cron` job that triggers every minute
+- RLS policies (service role only)
+- `pg_cron` job that triggers the Edge Function every minute
 
-**4. Install Supabase CLI and deploy the Edge Function**
+### Step 3 — Install Supabase CLI and link project
+
 ```bash
 npm i -g supabase
 supabase login
 supabase link --project-ref YOUR_PROJECT_REF
-./supabase/deploy.ps1
 ```
 
-**5. Sync your API keys to Supabase**
+### Step 4 — Deploy the Edge Function
+
+```powershell
+.\supabase\deploy.ps1
+```
+
+This deploys `scheduler-tick`, sets `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as Edge Function secrets, then runs `jimmy sync-credentials` to push all your API keys to `user_config`.
+
+### Step 5 — Verify
+
+```bash
+jimmy scheduler-debug
+```
+
+Should show the pg_cron job active and Edge Function reachable.
+
+### Re-sync after key changes
+
 ```bash
 jimmy sync-credentials
 ```
 
-**Done!** Scheduler runs every minute in Supabase. Your machine can be off.
+---
 
-**Monitor:**
-```bash
-jimmy scheduler-debug                      # CLI debug tool
-supabase functions logs scheduler-tick     # Edge Function logs
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_KEY` | Yes | OpenRouter API key |
+| `OPENROUTER_MODEL` | No | Model slug (default: `openrouter/free`) |
+| `GROQ_API_KEY` | For Scheduler/Browser | Groq API key |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | For Browser Agent | Google AI Studio key |
+| `SUPABASE_URL` | For Scheduler | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | For Scheduler | Supabase service role key |
+| `FIRECRAWL_KEY` | Optional | Firecrawl key for web search/scrape |
+| `GOOGLE_CLIENT_ID` | For Gmail | OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For Gmail | OAuth client secret |
+| `PORT` | For Gmail | OAuth callback port (default: 8787) |
+| `TELEGRAM_BOT_TOKEN` | For Telegram | Bot token from @BotFather |
+| `TELEGRAM_OWNER_ID` | For Telegram | Your Telegram chat ID |
+| `BROWSERBASE_API_KEY` | Optional | Cloud browser alternative |
+
+---
+
+## Models
+
+| Model | Used for |
+|-------|----------|
+| OpenRouter (configurable) | Agent, Plan, Ask, email AI functions |
+| Groq `llama-3.3-70b-versatile` | Scheduler planner + Browser Agent planner/evaluator |
+| `google/gemini-3.1-flash-lite-preview` | Stagehand browser execution |
+| OpenRouter (fallback) | Browser Agent + Scheduler fallback if primary fails |
+
+Set your preferred model in `.env`:
+```env
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+# or
+OPENROUTER_MODEL=openai/gpt-4o
 ```
 
-**Re-sync credentials after re-auth:**
-```bash
-jimmy sync-credentials
+---
+
+## Project Structure
+
+```
+jimmy/
+├── index.ts                  # CLI entry (commander)
+├── CLI/cli.ts                # Mode selector loop
+│
+├── agent/                    # Agent Mode
+│   ├── orchestrator.ts       # Agent loop + approval flow
+│   ├── agent-tools.ts        # File/folder/shell tools
+│   ├── tool-executor.ts      # Executes staged actions
+│   ├── action-tracker.ts     # Tracks pending mutations
+│   ├── approval.ts           # CLI approval prompt
+│   ├── diff-view.ts          # Diff renderer
+│   └── types.ts
+│
+├── ask/
+│   └── orchestrator.ts       # Ask loop with web + file + email tools
+│
+├── plan/
+│   ├── orchestrator.ts       # Plan mode loop
+│   ├── planner.ts            # LLM plan generation
+│   ├── selection.ts          # Step toggle UI
+│   ├── web-tools.ts          # Firecrawl tools
+│   ├── browser-tool.ts       # Standalone Stagehand runner
+│   ├── types.ts
+│   └── browser-agent/        # Browser Agent Mode
+│       ├── orchestrator.ts   # Iteration loop
+│       ├── planner.ts        # Browser plan generation
+│       ├── executor.ts       # Stagehand execution
+│       ├── evaluator.ts      # LLM scoring + feedback
+│       └── types.ts
+│
+├── email_ops/
+│   ├── email_functions.ts    # 16 Gmail functions
+│   ├── email-tools.ts        # AI SDK tool wrappers
+│   ├── email_init.ts         # OAuth flow
+│   ├── email_server.ts       # Express OAuth server
+│   ├── email_pass_store.ts   # Credential storage
+│   └── types.ts
+│
+├── scheduler/
+│   ├── orchestrator.ts       # CLI interface
+│   ├── planner.ts            # AI task planning
+│   ├── db.ts                 # Supabase client + helpers
+│   ├── config-sync.ts        # Auto credential sync
+│   ├── debug.ts              # jimmy scheduler-debug tool
+│   ├── update-task-email.ts  # Update email on existing tasks
+│   ├── SETUP-READY.sql       # Run once in Supabase SQL Editor
+│   ├── check-status.sql      # Diagnostic queries
+│   ├── ARCHITECTURE.md       # System design
+│   └── README.md
+│
+├── supabase/
+│   ├── functions/
+│   │   └── scheduler-tick/   # Edge Function (Deno)
+│   │       └── index.ts
+│   └── deploy.ps1            # Deploy + secrets + sync
+│
+├── auth/
+│   ├── auth.ts               # Login / setup / update flows
+│   ├── config-store.ts       # Persist config to ~/.cccontrol
+│   └── crypto.ts             # AES encrypt + password hash
+│
+├── config/
+│   └── ai.config.ts          # Model providers
+│
+└── tui/
+    ├── spinner.ts
+    ├── spinup.ts             # Mode selector UI
+    └── terminal-render.ts    # Markdown renderer
 ```
 
 ---
@@ -489,49 +491,28 @@ jimmy sync-credentials
 | `chalk` | Terminal colors |
 | `zod` | Schema validation |
 | `marked` + `marked-terminal` | Markdown rendering |
-| `express` | OAuth server for Gmail |
-| `node-cron` | (Optional) Cron for local daemon |
+| `express` | OAuth callback server for Gmail |
 | `diff` | Diff generation |
+| `dotenv` | Env var loading |
+| `open` | Open browser for OAuth |
+
+---
+
+## Security
+
+- API keys are AES-encrypted with your password before storage
+- Password is stored as a hash only — never plaintext
+- Gmail refresh token stored in `~/.cccontrol/googleAuth/` with `600` permissions
+- Supabase credentials auto-sync to `user_config` (not in git)
+- All credential files excluded from version control via `.gitignore`
 
 ---
 
 ## Runtime
 
-Requires [Bun](https://bun.sh). Uses `bun.lock` for reproducible installs.
+Requires [Bun](https://bun.sh).
 
 ```bash
 bun install
 jimmy jet
 ```
-
----
-
-## Features Summary
-
-✅ **5 Modes**: Agent, Plan, Browser Agent, Ask, Scheduler
-✅ **16 Email Functions**: Send, read, search, AI summaries, classify, extract tasks, etc.
-✅ **Browser Automation**: Authenticated sessions, iterative refinement, visual feedback
-✅ **Serverless Scheduler**: Runs 100% in Supabase — machine can be off, auto-syncs credentials
-✅ **Telegram Bot**: Full agent capabilities over Telegram
-✅ **File Operations**: Create, read, modify, delete with approval workflow  
-✅ **Web Tools**: Search, scrape via Firecrawl  
-✅ **Codebase Search**: Grep and fuzzy file search  
-✅ **Shell Integration**: Run commands, scaffold projects  
-✅ **Security**: Encrypted API keys, password-protected, OAuth for Gmail  
-✅ **Multi-Model**: OpenRouter, Groq, Google Gemini support  
-
----
-
-## Documentation
-
-- [`plan/browser-agent/README.md`](plan/browser-agent/README.md) - Browser Agent complete guide
-- [`plan/browser-agent/USAGE.md`](plan/browser-agent/USAGE.md) - Browser Agent examples
-- [`scheduler/README.md`](scheduler/README.md) - Scheduler complete documentation
-- [`scheduler/ARCHITECTURE.md`](scheduler/ARCHITECTURE.md) - Scheduler system design
-- [`scheduler/TROUBLESHOOTING.md`](scheduler/TROUBLESHOOTING.md) - Scheduler debugging guide
-
----
-
-## License
-
-MIT

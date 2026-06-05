@@ -22,7 +22,7 @@ Write-Host "2/3 Setting static secrets..." -ForegroundColor Green
 $env_file = Join-Path $PSScriptRoot "../.env"
 $lines = Get-Content $env_file
 $supabase_url = ($lines | Select-String "^SUPABASE_URL=").ToString().Split("=")[1].Trim('"').Trim("'")
-$supabase_key = ($lines | Select-String "^SUPABASE_KEY=").ToString().Split("=")[1].Trim('"').Trim("'")
+$supabase_key = ($lines | Select-String "^SUPABASE_SERVICE_ROLE_KEY=").ToString().Split("=")[1].Trim('"').Trim("'")
 
 if ($supabase_url) {
     supabase secrets set "SUPABASE_URL=$supabase_url"
@@ -43,8 +43,8 @@ Write-Host ""
 Write-Host "Deploy complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
-Write-Host "  1. Run the SQL in supabase/functions/scheduler-tick/setup.sql" -ForegroundColor White
-Write-Host "     to register the pg_cron job (one time only)" -ForegroundColor DarkGray
+Write-Host "  1. Run the SQL in supabase/SETUP-READY.sql (one time only)" -ForegroundColor White
+Write-Host "     Open Supabase Dashboard → SQL Editor, paste the file and click RUN" -ForegroundColor DarkGray
 Write-Host "  2. Your tasks will now run every minute in Supabase" -ForegroundColor White
 Write-Host "  3. Re-auth Gmail anytime - it auto-syncs to Supabase" -ForegroundColor White
 Write-Host ""

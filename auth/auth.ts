@@ -52,24 +52,100 @@ export async function setupAuth(): Promise<AuthResult> {
       if (!v.includes("sk-")) return "Invalid OpenRouter key format";
     },
   });
-  const apiKeyGemini=await text({
-    message:"Google Gemini API key (from Google AI Studio)",
-    placeholder:"xxxxx...",
-    validate:(v)=>{
-      if(!v?.trim()) return "API key is required"
-    }
-  })
-  if (isCancel(apiKey) || isCancel(apiKeyGemini)) throw new Error("Setup cancelled");
+  if (isCancel(apiKey)) throw new Error("Setup cancelled");
+
+  const apiKeyGemini = await text({
+    message: "Google Gemini API key (from Google AI Studio)",
+    placeholder: "AIza...",
+    validate: (v) => { if (!v?.trim()) return "API key is required"; },
+  });
+  if (isCancel(apiKeyGemini)) throw new Error("Setup cancelled");
+
+  const groqKey = await text({
+    message: "Groq API key (groq.com) — press Enter to skip",
+    placeholder: "gsk_...",
+  });
+  if (isCancel(groqKey)) throw new Error("Setup cancelled");
+
+  const telegramBotToken = await text({
+    message: "Telegram Bot Token — press Enter to skip",
+    placeholder: "123456:ABC-...",
+  });
+  if (isCancel(telegramBotToken)) throw new Error("Setup cancelled");
+
+  const telegramOwnerId = await text({
+    message: "Telegram Owner Chat ID — press Enter to skip",
+    placeholder: "123456789",
+  });
+  if (isCancel(telegramOwnerId)) throw new Error("Setup cancelled");
+
+  const supabaseUrl = await text({
+    message: "Supabase project URL — press Enter to skip",
+    placeholder: "https://xxxx.supabase.co",
+  });
+  if (isCancel(supabaseUrl)) throw new Error("Setup cancelled");
+
+  const supabaseServiceRoleKey = await text({
+    message: "Supabase service role key — press Enter to skip",
+    placeholder: "eyJ...",
+  });
+  if (isCancel(supabaseServiceRoleKey)) throw new Error("Setup cancelled");
+
+  const googleClientId = await text({
+    message: "Google OAuth Client ID — press Enter to skip",
+    placeholder: "xxxx.apps.googleusercontent.com",
+  });
+  if (isCancel(googleClientId)) throw new Error("Setup cancelled");
+
+  const googleClientSecret = await text({
+    message: "Google OAuth Client Secret — press Enter to skip",
+    placeholder: "GOCSPX-...",
+  });
+  if (isCancel(googleClientSecret)) throw new Error("Setup cancelled");
+
+  const firecrawlKey = await text({
+    message: "Firecrawl API key — press Enter to skip",
+    placeholder: "fc-...",
+  });
+  if (isCancel(firecrawlKey)) throw new Error("Setup cancelled");
+
+  const apifyKey = await text({
+    message: "Apify API key — press Enter to skip",
+    placeholder: "apify_api_...",
+  });
+  if (isCancel(apifyKey)) throw new Error("Setup cancelled");
+
+  const browserbaseApiKey = await text({
+    message: "Browserbase API key — press Enter to skip",
+    placeholder: "bb_live_...",
+  });
+  if (isCancel(browserbaseApiKey)) throw new Error("Setup cancelled");
+
+  const browserbaseProjectId = await text({
+    message: "Browserbase Project ID — press Enter to skip",
+    placeholder: "xxxxxxxx-...",
+  });
+  if (isCancel(browserbaseProjectId)) throw new Error("Setup cancelled");
 
   const passwordHash = hashPassword(pwd as string);
-  const encryptedApiKey = encrypt(apiKey as string, pwd as string);
-  const encryptgoogleKey=encrypt(apiKeyGemini as string,pwd as string);
+  const enc = (v: unknown) => (v && String(v).trim()) ? encrypt(String(v), pwd as string) : undefined;
 
   const config: StoredConfig = {
     username: username as string,
     passwordHash,
-    apiKey: encryptedApiKey,
-    apiKeyGemini:encryptgoogleKey,
+    apiKey: encrypt(apiKey as string, pwd as string),
+    apiKeyGemini: encrypt(apiKeyGemini as string, pwd as string),
+    groqKey: enc(groqKey),
+    telegramBotToken: enc(telegramBotToken),
+    telegramOwnerId: enc(telegramOwnerId),
+    supabaseUrl: enc(supabaseUrl),
+    supabaseServiceRoleKey: enc(supabaseServiceRoleKey),
+    googleClientId: enc(googleClientId),
+    googleClientSecret: enc(googleClientSecret),
+    firecrawlKey: enc(firecrawlKey),
+    apifyKey: enc(apifyKey),
+    browserbaseApiKey: enc(browserbaseApiKey),
+    browserbaseProjectId: enc(browserbaseProjectId),
     lastLogin: Date.now(),
   };
 
@@ -115,14 +191,37 @@ export async function loginAuth(): Promise<AuthResult> {
 }
 
 /**
- * Get decrypted API key from config
+ * Get all decrypted keys from config
  */
-export function getApiKey(config: StoredConfig, password: string):string[] {
+export function getAllKeys(config: StoredConfig, password: string): Record<string, string> {
+  const dec = (v: string | undefined) => (v ? decrypt(v, password) : "");
   try {
-    return [decrypt(config.apiKey, password),decrypt(config.apiKeyGemini,password)]
+    return {
+      OPENROUTER_KEY: dec(config.apiKey),
+      GOOGLE_GENERATIVE_AI_API_KEY: dec(config.apiKeyGemini),
+      GROQ_API_KEY: dec(config.groqKey),
+      TELEGRAM_BOT_TOKEN: dec(config.telegramBotToken),
+      TELEGRAM_OWNER_ID: dec(config.telegramOwnerId),
+      SUPABASE_URL: dec(config.supabaseUrl),
+      SUPABASE_SERVICE_ROLE_KEY: dec(config.supabaseServiceRoleKey),
+      GOOGLE_CLIENT_ID: dec(config.googleClientId),
+      GOOGLE_CLIENT_SECRET: dec(config.googleClientSecret),
+      FIRECRAWL_KEY: dec(config.firecrawlKey),
+      APIFY_API_KEY: dec(config.apifyKey),
+      BROWSERBASE_API_KEY: dec(config.browserbaseApiKey),
+      BROWSERBASE_PRODUCT_ID: dec(config.browserbaseProjectId),
+    };
   } catch {
-    throw new Error("Failed to decrypt API key");
+    throw new Error("Failed to decrypt keys — wrong password?");
   }
+}
+
+/**
+ * @deprecated use getAllKeys instead
+ */
+export function getApiKey(config: StoredConfig, password: string): string[] {
+  const keys = getAllKeys(config, password);
+  return [keys.OPENROUTER_KEY as string, keys.GOOGLE_GENERATIVE_AI_API_KEY as string];
 }
 
 export async function updateApiKey(): Promise<void> {
