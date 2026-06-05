@@ -48,19 +48,28 @@ export async function setupAuth(): Promise<AuthResult> {
     message: "OpenRouter API Key (from openrouter.ai)",
     placeholder: "sk-or-v1-...",
     validate: (v) => {
-      if (!v?.trim()) return "API key required";
+      if (!v?.trim()) return "API key is required";
       if (!v.includes("sk-")) return "Invalid OpenRouter key format";
     },
   });
-  if (isCancel(apiKey)) throw new Error("Setup cancelled");
+  const apiKeyGemini=await text({
+    message:"Google Gemini API key (from Google AI Studio)",
+    placeholder:"xxxxx...",
+    validate:(v)=>{
+      if(!v?.trim()) return "API key is required"
+    }
+  })
+  if (isCancel(apiKey) || isCancel(apiKeyGemini)) throw new Error("Setup cancelled");
 
   const passwordHash = hashPassword(pwd as string);
   const encryptedApiKey = encrypt(apiKey as string, pwd as string);
+  const encryptgoogleKey=encrypt(apiKeyGemini as string,pwd as string);
 
   const config: StoredConfig = {
     username: username as string,
     passwordHash,
     apiKey: encryptedApiKey,
+    apiKeyGemini:encryptgoogleKey,
     lastLogin: Date.now(),
   };
 
@@ -108,9 +117,9 @@ export async function loginAuth(): Promise<AuthResult> {
 /**
  * Get decrypted API key from config
  */
-export function getApiKey(config: StoredConfig, password: string): string {
+export function getApiKey(config: StoredConfig, password: string):string[] {
   try {
-    return decrypt(config.apiKey, password);
+    return [decrypt(config.apiKey, password),decrypt(config.apiKeyGemini,password)]
   } catch {
     throw new Error("Failed to decrypt API key");
   }

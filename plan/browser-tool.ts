@@ -124,5 +124,5 @@ Only call done when all 6 checks pass.
 };
 
 browserSearch(
-  `get transcript of video rag is dead from youtube on piyush garg`,
+  `go and find rag youtube video fo piyush garg get its link then go to youtube transcript site and get me its complete transcript`,
 );

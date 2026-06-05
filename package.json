@@ -20,6 +20,8 @@
     "@clack/prompts": "^1.5.0",
     "@mendable/firecrawl-js": "^4.25.1",
     "@openrouter/ai-sdk-provider": "^2.9.0",
+    "@supabase/supabase-js": "^2.107.0",
+    "@types/express": "^5.0.6",
     "@types/marked-terminal": "^6.1.1",
     "@types/node": "^25.9.1",
     "ai": "^6.0.193",
@@ -28,9 +30,13 @@
     "crypto": "^1.0.1",
     "diff": "^9.0.0",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "figlet": "^1.11.0",
+    "googleapis": "^173.0.0",
     "marked": "^18.0.4",
     "marked-terminal": "^7.3.0",
+    "open": "^11.0.0",
+    "supabase": "^2.105.0",
     "telegraf": "^4.16.3"
   }
 }

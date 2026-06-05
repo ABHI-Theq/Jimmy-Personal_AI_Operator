@@ -1,5 +1,9 @@
 import { Stagehand } from "@browserbasehq/stagehand";
+import { existsSync, mkdirSync } from "fs";
+import path, { resolve } from "path";
 import type { BrowserPlan, ExecutionResult } from "./types";
+
+const DOWNLOADS_PATH = resolve("C:/Users/SWEETY/Downloads");
 
 let globalStagehand: InstanceType<typeof Stagehand> | null = null;
 
@@ -224,12 +228,64 @@ Rules:
 - Avoid unnecessary navigation.
 - Extract all requested structured data.
 - Stop only when the task is fully complete.
+- Extract details in deep provide complete comprehensive details about the topic then call it done
 
 Before calling done:
 1. Re-read the original user request.
 2. Verify every requested piece of information is collected.
 3. If anything is missing, continue browsing.
-4. Only call done when all requirements are satisfied.`;
+4. Only call done when all requirements are satisfied.
+
+User asks:
+"Get top 5 jobs and detailed descriptions."
+
+Required:
+✓ 5 jobs found
+✓ description for job 1
+✓ description for job 2
+✓ description for job 3
+✓ description for job 4
+✓ description for job 5
+
+Only call done when all 6 checks pass.
+`;
+
+  // Ensure downloads folder exists
+ if(!existsSync(DOWNLOADS_PATH)) mkdirSync(DOWNLOADS_PATH, { recursive: true });
+
+  // Use CDP directly to intercept downloads — stagehand.context.conn is a CdpConnection.
+  const conn = (stagehand.context as any).conn;
+  const downloadedFiles: string[] = [];
+
+  // Tell the browser to save all downloads to our path automatically
+  await conn.send("Browser.setDownloadBehavior", {
+    behavior: "allow",
+    downloadPath: DOWNLOADS_PATH,
+    eventsEnabled: true,
+  });
+
+  // Track filenames as downloads begin
+  const pendingDownloads = new Map<string, string>(); // guid → filename
+  conn.on("Browser.downloadWillBegin", (params: any) => {
+    const filename = params.suggestedFilename || `download-${params.guid}`;
+    const savePath = resolve(DOWNLOADS_PATH, filename);
+    pendingDownloads.set(params.guid, savePath);
+    console.log(`[download] starting → ${savePath}`);
+  });
+
+  conn.on("Browser.downloadProgress", (params: any) => {
+    if (params.state === "completed") {
+      const savePath = pendingDownloads.get(params.guid);
+      if (savePath) {
+        downloadedFiles.push(savePath);
+        pendingDownloads.delete(params.guid);
+        console.log(`[download] saved → ${savePath}`);
+      }
+    } else if (params.state === "canceled") {
+      pendingDownloads.delete(params.guid);
+      console.warn(`[download] canceled guid=${params.guid}`);
+    }
+  });
 
   try {
     const agent = stagehand.agent({
@@ -239,7 +295,7 @@ Before calling done:
 
     const res = await agent.execute({
       instruction,
-      maxSteps: 6,
+      maxSteps: 10,
       highlightCursor: true,
     });
 
@@ -272,6 +328,7 @@ Before calling done:
         data:
           extractedData ??
           (topLevelText ? { output: topLevelText } : undefined),
+        ...(downloadedFiles.length > 0 && { downloadedFiles }),
       },
     ];
   } catch (error) {

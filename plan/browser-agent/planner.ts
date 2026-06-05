@@ -1,4 +1,4 @@
-import { getAgentModel2, getAgentModel2Fallback } from "../../config/ai.config";
+import { getAgentModel, getAgentModel2, getAgentModel2Fallback } from "../../config/ai.config";
 import type { BrowserPlan, BrowserStep } from "./types";
 import { generateText } from "ai";
 import { z } from "zod";
@@ -76,7 +76,7 @@ export async function generateBrowserPlan(
   query: string,
   previousFeedback?: string
 ): Promise<BrowserPlan> {
-  let model = getAgentModel2();
+  let model = getAgentModel();
   let usingFallback = false;
 
   const systemPrompt = `You are a browser automation planner. Your task is to create a detailed plan for how to automate a browser task.

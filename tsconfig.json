@@ -27,5 +27,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // Exclude Deno-based Supabase Edge Functions from Node/Bun compilation
+  "exclude": ["supabase/functions"]
 }

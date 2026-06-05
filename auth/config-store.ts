@@ -9,6 +9,7 @@ export interface StoredConfig {
   username: string;
   passwordHash: string;
   apiKey: string;
+  apiKeyGemini:string;
   lastLogin: number;
 }
 

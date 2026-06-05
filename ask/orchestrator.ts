@@ -11,6 +11,8 @@ import { renderHTMLMarkdown } from "../tui/terminal-render.ts";
 import { getAgentModel } from "../config/ai.config.ts";
 import { createWebTools } from "../plan/web-tools.ts";
 import { withSpinner } from "../tui/spinner";
+import { createEmailTools } from "../email_ops/email-tools";
+import { sendMail } from "../email_ops/email_functions";
 
 function createAskTools(executor: ToolExecutor) {
   return {
@@ -93,6 +95,7 @@ export async function runAskMode() {
   const tools = {
     ...createAskTools(executor),
     ...createWebTools(tracker),
+    ...createEmailTools(),
   };
 
   const agent = new ToolLoopAgent({
@@ -153,12 +156,27 @@ export async function runAskMode() {
       message: 'What next?',
       options: [
         { value: 'continue', label: 'Ask another question' },
+        { value: 'email', label: 'Send this answer to my email' },
         { value: 'save', label: 'Save important summary and exit' },
         { value: 'exit', label: 'Exit without saving' },
       ],
     });
 
     if (isCancel(next) || next === 'exit') break;
+    if (next === 'email') {
+      const emailTo = await text({ message: 'Send to (email address)?' });
+      if (!isCancel(emailTo) && emailTo?.trim()) {
+        await withSpinner('Sending email…', async () =>
+          sendMail({
+            to: emailTo.trim(),
+            subject: `Ask Mode: ${(question as string).trim().slice(0, 60)}`,
+            body: answer,
+          })
+        );
+        console.log(chalk.green('✓ Email sent\n'));
+      }
+      continue;
+    }
     if (next === 'save') {
       shouldSaveSummary = true;
       break;

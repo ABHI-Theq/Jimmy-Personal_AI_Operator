@@ -8,6 +8,7 @@ import {
   evaluateExecutionResults,
   extractFeedbackForNextIteration,
 } from "./evaluator";
+import { sendMail } from "../../email_ops/email_functions";
 import type {
   BrowserAgentResult,
   IterationResult,
@@ -224,6 +225,40 @@ export async function runBrowserAgentMode(): Promise<void> {
       const filepath = path.resolve(process.cwd(), filename);
       fs.writeFileSync(filepath, reportMarkdown, "utf8");
       console.log(chalk.green(`✓ Saved to ${filename}\n`));
+    }
+
+    // ── Email option ──────────────────────────────────────────────────
+    const shouldEmail = await confirm({
+      message: "Send a summary to your email?",
+      initialValue: false,
+    });
+
+    if (shouldEmail) {
+      const emailTo = await text({ message: "Send to (email address)?" });
+      if (typeof emailTo === "string" && emailTo.trim()) {
+        // Build a concise email body from the agent output + score
+        const agentOut = lastExecution?.agentOutput ?? "";
+        const scoreInfo = lastEvaluation
+          ? `Score: ${lastEvaluation.score}/100 | Completeness: ${lastEvaluation.completeness}%`
+          : "";
+        const emailBody = [
+          `Query: ${query}`,
+          scoreInfo,
+          "",
+          agentOut || JSON.stringify(finalData, null, 2) || "(no output)",
+        ]
+          .filter(Boolean)
+          .join("\n");
+
+        await withSpinner("Sending email…", () =>
+          sendMail({
+            to: emailTo.trim(),
+            subject: `Browser Agent: ${query.slice(0, 60)}`,
+            body: emailBody,
+          })
+        );
+        console.log(chalk.green("✓ Email sent\n"));
+      }
     }
   } catch (error) {
     console.log(chalk.red("\n❌ Browser Agent Error:"));

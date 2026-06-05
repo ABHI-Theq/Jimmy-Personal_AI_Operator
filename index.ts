@@ -14,9 +14,10 @@ program.command("jet")
     async()=>{
         try {
             const { config, password } = await authenticate();
-            const apiKey = getApiKey(config, password);
+            const [apiKey,apiKeyGemini] = getApiKey(config, password);
             process.env.OPENROUTER_KEY = apiKey;
             process.env.OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openrouter/free";
+            process.env.GOOGLE_GENERATIVE_AI_API_KEY=apiKeyGemini
             await startArena()
         } catch (error) {
             if (error instanceof Error && error.message.includes("cancelled")) {
@@ -57,6 +58,26 @@ program.command("reset-auth")
         console.log(chalk.red(error instanceof Error ? error.message : String(error)));
         process.exit(0);
     }
+});
+
+program.command("sync-credentials")
+.description("Sync API keys and credentials to Supabase user_config table")
+.action(async () => {
+    try {
+        const { syncAllSecrets } = await import("./scheduler/config-sync");
+        await syncAllSecrets();
+        console.log(chalk.green("\n✓ Credentials synced to Supabase user_config table\n"));
+    } catch (error) {
+        console.log(chalk.red("Sync failed"));
+        console.log(chalk.red(error instanceof Error ? error.message : String(error)));
+        process.exit(1);
+    }
+});
+
+program.command("scheduler-debug")
+.description("Debug scheduler: check tasks, credentials, and test Edge Function")
+.action(async () => {
+    await import("./scheduler/debug");
 });
 
 await program.parseAsync(process.argv)
