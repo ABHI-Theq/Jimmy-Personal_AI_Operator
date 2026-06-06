@@ -4,6 +4,12 @@ A terminal-first AI agent that runs in your terminal. Five modes: autonomous cod
 
 ---
 
+## Video Demo
+
+[Watch the demo on LinkedIn](https://www.linkedin.com/posts/abhishek-sharma-one_buildinpublic-aiagents-agenticai-ugcPost-7468770330895896576-4Rcf/?utm_source=share&utm_medium=member_desktop&rcm=ACoAAEPD8bwBiNXjv2quMd_V_U85lj38fK4tiIw)
+
+---
+
 ## Modes
 
 | Mode | What it does |
