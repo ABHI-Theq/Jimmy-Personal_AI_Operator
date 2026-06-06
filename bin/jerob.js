@@ -1,17 +1,14 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-import { execFileSync } from "node:child_process";
-import path from "node:path";
-
-/**
- * npm entry point for jerob.
- * Requires Bun to be installed: https://bun.sh
- * Shells out to Bun so the TypeScript source runs natively.
- */
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Check Bun is available
 try {
-  execFileSync("bun", ["--version"], { stdio: "ignore" });
+  const check = spawnSync("bun", ["--version"], { stdio: "ignore" });
+  if (check.error) throw check.error;
 } catch {
   console.error(
     "\n[jerob] Bun is required but not installed.\n" +
@@ -22,9 +19,18 @@ try {
   process.exit(1);
 }
 
-const entry = path.join(__dirname, "..", "index.ts");
+const entry = join(__dirname, "..", "index.ts");
 
-execFileSync("bun", [entry, ...process.argv.slice(2)], {
+// Use spawnSync instead of execFileSync so non-zero exit codes
+// (e.g. Commander printing help) don't throw an exception
+const result = spawnSync("bun", [entry, ...process.argv.slice(2)], {
   stdio: "inherit",
   cwd: process.cwd(),
 });
+
+if (result.error) {
+  console.error("[jerob] Failed to start:", result.error.message);
+  process.exit(1);
+}
+
+process.exit(result.status ?? 0);

@@ -1,6 +1,6 @@
 {
   "name": "jerob",
-  "version": "1.1.0",
+  "version": "1.2.2",
   "description": "Personal AI agent CLI — autonomous code agent, planner, browser automation, Q&A, and serverless scheduler",
   "module": "index.ts",
   "private": false,
@@ -20,6 +20,7 @@
     "plan/",
     "scheduler/",
     "supabase/",
+    "Telegram/",
     "tui/",
     "utils/",
     "tsconfig.json",
